@@ -203,7 +203,7 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
         // Format IP: compress IPv6, leave IPv4 as is
         let formatted_ip = if let Ok(addr) = ip.parse::<std::net::Ipv6Addr>() {
             // Use the standard compressed format for IPv6
-            format!("[{}]", addr)
+            format!("[{addr}]" )
         } else {
             ip.clone()
         };
