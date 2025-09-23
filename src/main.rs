@@ -1,5 +1,32 @@
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_ip() {
+        assert!(is_valid_ip("192.168.1.1"));
+        assert!(is_valid_ip("2001:db8::1"));
+        assert!(!is_valid_ip("not.an.ip"));
+        assert!(!is_valid_ip("999.999.999.999"));
+    }
+
+    #[test]
+    fn test_parse_log_file_counts_ips() {
+        let log = "2025-09-23 12:00:01,123 fail2ban.actions [1234]: NOTICE  [sshd] Ban 192.0.2.1\n2025-09-23 12:01:02,456 fail2ban.actions [1234]: NOTICE  [sshd] Ban 2001:db8::1\n2025-09-23 12:02:03,789 fail2ban.actions [1234]: NOTICE  [sshd] Ban 192.0.2.1\n";
+        use std::fs::File;
+        use std::io::Write;
+        let path = "test_ban_log.txt";
+        let mut file = File::create(path).unwrap();
+        file.write_all(log.as_bytes()).unwrap();
+        let counts = parse_log_file(path);
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(counts.get("192.0.2.1"), Some(&2));
+        assert_eq!(counts.get("2001:db8::1"), Some(&1));
+    }
+}
 /// Type alias for the future used in IP info lookups.
-type IpInfoFuture = futures::future::BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
+type IpInfoFuture =
+    futures::future::BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
 // ...existing code...
 /// Validates an IP address string (IPv4 or IPv6).
 fn is_valid_ip(ip: &str) -> bool {
@@ -14,15 +41,15 @@ fn is_valid_ip(ip: &str) -> bool {
     false
 }
 
-use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::io::{Write, BufWriter};
 use futures::stream::{FuturesUnordered, StreamExt};
-use reqwest::Client;
-use std::env;
 use indicatif::{ProgressBar, ProgressStyle};
+use reqwest::Client;
+use std::collections::HashMap;
+use std::env;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader};
+use std::io::{BufWriter, Write};
 
 use regex::Regex;
 
@@ -47,7 +74,8 @@ async fn main() {
             let mut headers = reqwest::header::HeaderMap::new();
             headers.insert(
                 reqwest::header::AUTHORIZATION,
-                reqwest::header::HeaderValue::from_str(&format!("Bearer {token}")).expect("Invalid token format"),
+                reqwest::header::HeaderValue::from_str(&format!("Bearer {token}"))
+                    .expect("Invalid token format"),
             );
             headers
         })
@@ -124,8 +152,20 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
                     Ok(line) => {
                         let parts: Vec<_> = line.splitn(3, '\t').collect();
                         if parts.len() == 3 && is_valid_ip(parts[0]) {
-                            cache.insert(parts[0].to_string(), (Some(parts[1].to_string()).filter(|s| s != "N/A"), Some(parts[2].to_string()).filter(|s| s != "N/A")));
-                            initial_cache.insert(parts[0].to_string(), (Some(parts[1].to_string()).filter(|s| s != "N/A"), Some(parts[2].to_string()).filter(|s| s != "N/A")));
+                            cache.insert(
+                                parts[0].to_string(),
+                                (
+                                    Some(parts[1].to_string()).filter(|s| s != "N/A"),
+                                    Some(parts[2].to_string()).filter(|s| s != "N/A"),
+                                ),
+                            );
+                            initial_cache.insert(
+                                parts[0].to_string(),
+                                (
+                                    Some(parts[1].to_string()).filter(|s| s != "N/A"),
+                                    Some(parts[2].to_string()).filter(|s| s != "N/A"),
+                                ),
+                            );
                         } else {
                             eprintln!("Warning: Skipping malformed or invalid cache line: {line}");
                         }
@@ -143,7 +183,9 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
 
     let mut futures: FuturesUnordered<IpInfoFuture> = FuturesUnordered::new();
     let pb = ProgressBar::new(ip_vec.len() as u64);
-    pb.set_style(ProgressStyle::with_template("[{bar:40.cyan/blue}] {pos}/{len} IPs looked up").unwrap());
+    pb.set_style(
+        ProgressStyle::with_template("[{bar:40.cyan/blue}] {pos}/{len} IPs looked up").unwrap(),
+    );
 
     for (ip, count) in ip_vec.clone() {
         let ip_str = ip.clone();
@@ -195,15 +237,13 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
         }
     }
 
-
-
     // Sort results by count descending before printing
     results.sort_by(|a, b| b.1.cmp(&a.1));
     for (ip, count, result) in results {
         // Format IP: compress IPv6, leave IPv4 as is
         let formatted_ip = if let Ok(addr) = ip.parse::<std::net::Ipv6Addr>() {
             // Use the standard compressed format for IPv6
-            format!("[{addr}]" )
+            format!("[{addr}]")
         } else {
             ip.clone()
         };

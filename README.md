@@ -10,7 +10,6 @@ cargo run --release
 ```
 
 This will parse the example log and print IP info to the console.
-# faillog
 
 ## Quick Start
 
