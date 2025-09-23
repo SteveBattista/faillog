@@ -1,3 +1,5 @@
+/// Type alias for the future used in IP info lookups.
+type IpInfoFuture = BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
 /// Validates an IP address string (IPv4 or IPv6).
 fn is_valid_ip(ip: &str) -> bool {
     // Try IPv4
@@ -113,6 +115,7 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
     // Load cache from file
     let cache_path = "ipinfo_cache.tsv";
     let mut cache: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
+    let mut initial_cache: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
     match File::open(cache_path) {
         Ok(cache_file) => {
             let reader = BufReader::new(cache_file);
@@ -122,6 +125,7 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
                         let parts: Vec<_> = line.splitn(3, '\t').collect();
                         if parts.len() == 3 && is_valid_ip(parts[0]) {
                             cache.insert(parts[0].to_string(), (Some(parts[1].to_string()).filter(|s| s != "N/A"), Some(parts[2].to_string()).filter(|s| s != "N/A")));
+                            initial_cache.insert(parts[0].to_string(), (Some(parts[1].to_string()).filter(|s| s != "N/A"), Some(parts[2].to_string()).filter(|s| s != "N/A")));
                         } else {
                             eprintln!("Warning: Skipping malformed or invalid cache line: {line}");
                         }
@@ -137,7 +141,7 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
         }
     }
 
-    let mut futures: FuturesUnordered<BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>> = FuturesUnordered::new();
+    let mut futures: FuturesUnordered<IpInfoFuture> = FuturesUnordered::new();
     let pb = ProgressBar::new(ip_vec.len() as u64);
     pb.set_style(ProgressStyle::with_template("[{bar:40.cyan/blue}] {pos}/{len} IPs looked up").unwrap());
 
@@ -163,10 +167,12 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
     while let Some((ip, count, result)) = futures.next().await {
         pb.inc(1);
         if let Ok(ref info) = result {
-            // Save to cache
-            let country = info.country.clone().unwrap_or_else(|| "N/A".to_string());
-            let org = info.org.clone().unwrap_or_else(|| "N/A".to_string());
-            new_cache_lines.push(format!("{ip}\t{country}\t{org}"));
+            // Only add to cache if not present in initial cache
+            if !initial_cache.contains_key(&ip) {
+                let country = info.country.clone().unwrap_or_else(|| "N/A".to_string());
+                let org = info.org.clone().unwrap_or_else(|| "N/A".to_string());
+                new_cache_lines.push(format!("{ip}\t{country}\t{org}"));
+            }
         }
         results.push((ip, count, result));
     }
