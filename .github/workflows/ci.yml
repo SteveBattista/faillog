@@ -8,10 +8,9 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container:
-      image: rust:latest
+    docker:
+      - image: cimg/rust:1.90.0
     steps:
-      - uses: actions/checkout@v4
+      - checkout
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
