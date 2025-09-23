@@ -1,5 +1,6 @@
 /// Type alias for the future used in IP info lookups.
-type IpInfoFuture = BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
+type IpInfoFuture = futures::future::BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
+// ...existing code...
 /// Validates an IP address string (IPv4 or IPv6).
 fn is_valid_ip(ip: &str) -> bool {
     // Try IPv4
@@ -12,7 +13,6 @@ fn is_valid_ip(ip: &str) -> bool {
     }
     false
 }
-use futures::future::BoxFuture;
 
 use std::collections::HashMap;
 use std::fs::OpenOptions;
@@ -200,16 +200,23 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
     // Sort results by count descending before printing
     results.sort_by(|a, b| b.1.cmp(&a.1));
     for (ip, count, result) in results {
+        // Format IP: compress IPv6, leave IPv4 as is
+        let formatted_ip = if let Ok(addr) = ip.parse::<std::net::Ipv6Addr>() {
+            // Use the standard compressed format for IPv6
+            format!("[{}]", addr)
+        } else {
+            ip.clone()
+        };
         match result {
             Ok(info) => {
                 println!(
-                    "IP: {ip} | Count: {count} | Country: {} | Org: {}",
+                    "IP: {formatted_ip} | Count: {count} | Country: {} | Org: {}",
                     info.country.unwrap_or_else(|| "N/A".to_string()),
                     info.org.unwrap_or_else(|| "N/A".to_string())
                 );
             }
             Err(e) => {
-                println!("IP: {ip} | Count: {count} | Lookup failed: {e}");
+                println!("IP: {formatted_ip} | Count: {count} | Lookup failed: {e}");
             }
         }
     }

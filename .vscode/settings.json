@@ -1,10 +1,12 @@
 {
     "cSpell.words": [
+        "clippy",
         "dotenvy",
         "faillog",
         "indicatif",
         "ipinfo",
         "reqwest",
+        "rustup",
         "serde",
         "splitn"
     ]
