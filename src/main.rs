@@ -1,45 +1,4 @@
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_valid_ip() {
-        assert!(is_valid_ip("192.168.1.1"));
-        assert!(is_valid_ip("2001:db8::1"));
-        assert!(!is_valid_ip("not.an.ip"));
-        assert!(!is_valid_ip("999.999.999.999"));
-    }
-
-    #[test]
-    fn test_parse_log_file_counts_ips() {
-        let log = "2025-09-23 12:00:01,123 fail2ban.actions [1234]: NOTICE  [sshd] Ban 192.0.2.1\n2025-09-23 12:01:02,456 fail2ban.actions [1234]: NOTICE  [sshd] Ban 2001:db8::1\n2025-09-23 12:02:03,789 fail2ban.actions [1234]: NOTICE  [sshd] Ban 192.0.2.1\n";
-        use std::fs::File;
-        use std::io::Write;
-        let path = "test_ban_log.txt";
-        let mut file = File::create(path).unwrap();
-        file.write_all(log.as_bytes()).unwrap();
-        let counts = parse_log_file(path);
-        std::fs::remove_file(path).unwrap();
-        assert_eq!(counts.get("192.0.2.1"), Some(&2));
-        assert_eq!(counts.get("2001:db8::1"), Some(&1));
-    }
-}
-/// Type alias for the future used in IP info lookups.
-type IpInfoFuture =
-    futures::future::BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
-// ...existing code...
-/// Validates an IP address string (IPv4 or IPv6).
-fn is_valid_ip(ip: &str) -> bool {
-    // Try IPv4
-    if ip.parse::<std::net::Ipv4Addr>().is_ok() {
-        return true;
-    }
-    // Try IPv6
-    if ip.parse::<std::net::Ipv6Addr>().is_ok() {
-        return true;
-    }
-    false
-}
+#![forbid(unsafe_code)]
 
 use futures::stream::{FuturesUnordered, StreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -52,37 +11,8 @@ use std::io::{BufRead, BufReader};
 use std::io::{BufWriter, Write};
 
 use regex::Regex;
+use log::{warn, error};
 
-/// Main entry point for the faillog application.
-///
-/// Orchestrates the process of:
-/// - Parsing the ban log file to extract and count unique IP addresses.
-/// - Printing the number of unique IPs found.
-/// - Looking up and displaying information (country, organization) for each IP,
-///   sorted by the number of occurrences in descending order.
-///
-/// # Panics
-/// Panics if the log file cannot be opened or the HTTP client cannot be built.
-#[tokio::main]
-async fn main() {
-    dotenvy::from_filename(".env").ok();
-    let ip_counts = parse_log_file("data/ban_log.txt");
-    println!("Found {} unique IPs", ip_counts.len());
-    let token = env::var("IPINFO_TOKEN").expect("IPINFO_TOKEN environment variable not set");
-    let client = Client::builder()
-        .default_headers({
-            let mut headers = reqwest::header::HeaderMap::new();
-            headers.insert(
-                reqwest::header::AUTHORIZATION,
-                reqwest::header::HeaderValue::from_str(&format!("Bearer {token}"))
-                    .expect("Invalid token format"),
-            );
-            headers
-        })
-        .build()
-        .expect("Failed to build reqwest client");
-    print_ip_info_sorted(ip_counts, &client).await;
-}
 
 /// Parses the log file and counts the occurrences of each IPv4 address.
 ///
@@ -105,7 +35,7 @@ fn parse_log_file(file_path: &str) -> HashMap<String, usize> {
     let file = match File::open(file_path) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("Error: Failed to open log file: {e}");
+            error!("Failed to open log file: {e}");
             return HashMap::new();
         }
     };
@@ -167,17 +97,17 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
                                 ),
                             );
                         } else {
-                            eprintln!("Warning: Skipping malformed or invalid cache line: {line}");
+                            warn!("Skipping malformed or invalid cache line: {line}");
                         }
                     }
                     Err(e) => {
-                        eprintln!("Warning: Failed to read cache line: {e}");
+                        warn!("Failed to read cache line: {e}");
                     }
                 }
             }
         }
         Err(e) => {
-            eprintln!("Warning: Could not open cache file: {e}");
+            warn!("Could not open cache file: {e}");
         }
     }
 
@@ -232,7 +162,7 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
         let mut writer = BufWriter::new(&mut file);
         for line in new_cache_lines {
             if let Err(e) = writeln!(writer, "{line}") {
-                eprintln!("Warning: Failed to write cache line: {e}");
+                warn!("Failed to write cache line: {e}");
             }
         }
     }
@@ -294,4 +224,81 @@ async fn lookup_ip_info(ip: &str, client: &Client) -> Result<IpInfo, reqwest::Er
     }
     let info = resp.json::<IpInfo>().await?;
     Ok(info)
+}
+
+
+
+/// Main entry point for the faillog application.
+///
+/// Orchestrates the process of:
+/// - Parsing the ban log file to extract and count unique IP addresses.
+/// - Printing the number of unique IPs found.
+/// - Looking up and displaying information (country, organization) for each IP,
+///   sorted by the number of occurrences in descending order.
+///
+/// # Panics
+/// Panics if the log file cannot be opened or the HTTP client cannot be built.
+#[tokio::main]
+async fn main() {
+    dotenvy::from_filename(".env").ok();
+    env_logger::init();
+    let ip_counts = parse_log_file("data/ban_log.txt");
+    println!("Found {} unique IPs", ip_counts.len());
+    let token = env::var("IPINFO_TOKEN").expect("IPINFO_TOKEN environment variable not set");
+    let client = Client::builder()
+        .default_headers({
+            let mut headers = reqwest::header::HeaderMap::new();
+            headers.insert(
+                reqwest::header::AUTHORIZATION,
+                reqwest::header::HeaderValue::from_str(&format!("Bearer {token}"))
+                    .expect("Invalid token format"),
+            );
+            headers
+        })
+        .build()
+        .expect("Failed to build reqwest client");
+    print_ip_info_sorted(ip_counts, &client).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_ip() {
+        assert!(is_valid_ip("192.168.1.1"));
+        assert!(is_valid_ip("2001:db8::1"));
+        assert!(!is_valid_ip("not.an.ip"));
+        assert!(!is_valid_ip("999.999.999.999"));
+    }
+
+    #[test]
+    fn test_parse_log_file_counts_ips() {
+        let log = "2025-09-23 12:00:01,123 fail2ban.actions [1234]: NOTICE  [sshd] Ban 192.0.2.1\n2025-09-23 12:01:02,456 fail2ban.actions [1234]: NOTICE  [sshd] Ban 2001:db8::1\n2025-09-23 12:02:03,789 fail2ban.actions [1234]: NOTICE  [sshd] Ban 192.0.2.1\n";
+        use std::fs::File;
+        use std::io::Write;
+        let path = "test_ban_log.txt";
+        let mut file = File::create(path).unwrap();
+        file.write_all(log.as_bytes()).unwrap();
+        let counts = parse_log_file(path);
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(counts.get("192.0.2.1"), Some(&2));
+        assert_eq!(counts.get("2001:db8::1"), Some(&1));
+    }
+}
+/// Type alias for the future used in IP info lookups.
+type IpInfoFuture =
+    futures::future::BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
+// ...existing code...
+/// Validates an IP address string (IPv4 or IPv6).
+fn is_valid_ip(ip: &str) -> bool {
+    // Try IPv4
+    if ip.parse::<std::net::Ipv4Addr>().is_ok() {
+        return true;
+    }
+    // Try IPv6
+    if ip.parse::<std::net::Ipv6Addr>().is_ok() {
+        return true;
+    }
+    false
 }
