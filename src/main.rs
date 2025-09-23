@@ -14,6 +14,42 @@ use regex::Regex;
 use log::{warn, error};
 
 
+/// Type alias for the future used in IP info lookups.
+type IpInfoFuture =
+    futures::future::BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
+
+/// Checks if a string is a valid IPv4 or IPv6 address.
+///
+/// This function attempts to parse the input string as both an IPv4 and IPv6 address.
+/// It returns `true` if the string is a valid IP address in either format, and `false` otherwise.
+///
+/// # Arguments
+/// * `ip` - A string slice that may represent an IP address.
+///
+/// # Returns
+/// * `true` if the input is a valid IPv4 or IPv6 address.
+/// * `false` if the input is not a valid IP address.
+///
+/// # Examples
+/// ```
+/// assert!(is_valid_ip("192.168.1.1"));
+/// assert!(is_valid_ip("2001:db8::1"));
+/// assert!(!is_valid_ip("not.an.ip"));
+/// ```
+fn is_valid_ip(ip: &str) -> bool {
+    // Try IPv4
+    if ip.parse::<std::net::Ipv4Addr>().is_ok() {
+        return true;
+    }
+    // Try IPv6
+    if ip.parse::<std::net::Ipv6Addr>().is_ok() {
+        return true;
+    }
+    false
+}
+
+
+
 /// Parses the log file and counts the occurrences of each IPv4 address.
 ///
 /// Reads the specified log file line by line, extracts all IPv4 addresses using a regular
@@ -285,20 +321,4 @@ mod tests {
         assert_eq!(counts.get("192.0.2.1"), Some(&2));
         assert_eq!(counts.get("2001:db8::1"), Some(&1));
     }
-}
-/// Type alias for the future used in IP info lookups.
-type IpInfoFuture =
-    futures::future::BoxFuture<'static, (String, usize, Result<IpInfo, reqwest::Error>)>;
-// ...existing code...
-/// Validates an IP address string (IPv4 or IPv6).
-fn is_valid_ip(ip: &str) -> bool {
-    // Try IPv4
-    if ip.parse::<std::net::Ipv4Addr>().is_ok() {
-        return true;
-    }
-    // Try IPv6
-    if ip.parse::<std::net::Ipv6Addr>().is_ok() {
-        return true;
-    }
-    false
 }
