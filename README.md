@@ -3,6 +3,7 @@
 A Rust tool to parse fail2ban log files, extract unique IP addresses, and look up their owner and country using the ipinfo.io API.
 
 ## Features
+
 - Parses a log file (e.g., `data/ban_log.txt`) for banned IP addresses
 - Counts occurrences of each unique IP
 - Looks up country and organization for each IP using ipinfo.io
@@ -12,21 +13,31 @@ A Rust tool to parse fail2ban log files, extract unique IP addresses, and look u
 
 ## Usage
 
-1. **Build the project:**
-   ```sh
+1. **Set up your API token:**
+
+   - Copy `.env.example` to `.env` and add your [ipinfo.io](https://ipinfo.io/) API token:
+
+     ```sh
+     cp .env.example .env
+     # Then edit .env and set your IPINFO_TOKEN
+     ```
+
+2. **Build the project:**
+
+   ```bash
    cargo build --release
    ```
 
-2. **Run the tool:**
-   ```sh
+3. **Run the tool:**
+
+   ```bash
    cargo run --release
    ```
+
    The tool will parse `data/ban_log.txt` and print results to the console.
 
-3. **API Token:**
-   The tool uses an ipinfo.io API token (already set in the code). If you need to change it, update the token in `main.rs`.
-
 ## Dependencies
+
 - [tokio](https://crates.io/crates/tokio)
 - [reqwest](https://crates.io/crates/reqwest)
 - [serde](https://crates.io/crates/serde)
@@ -35,9 +46,11 @@ A Rust tool to parse fail2ban log files, extract unique IP addresses, and look u
 - [futures](https://crates.io/crates/futures)
 
 ## Notes
+
 - The cache file `ipinfo_cache.tsv` is automatically updated with new lookups.
 - The file `ipinfo_cache.tsv` is excluded from spell checking.
 - The tool is designed for Linux and should work on any platform supported by Rust and the dependencies.
 
 ## License
-MIT
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

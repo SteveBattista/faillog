@@ -1,3 +1,15 @@
+/// Validates an IP address string (IPv4 or IPv6).
+fn is_valid_ip(ip: &str) -> bool {
+    // Try IPv4
+    if ip.parse::<std::net::Ipv4Addr>().is_ok() {
+        return true;
+    }
+    // Try IPv6
+    if ip.parse::<std::net::Ipv6Addr>().is_ok() {
+        return true;
+    }
+    false
+}
 use futures::future::BoxFuture;
 
 use std::collections::HashMap;
@@ -56,14 +68,25 @@ async fn main() {
 /// # Panics
 /// Panics if the file cannot be opened or the regex cannot be compiled.
 fn parse_log_file(file_path: &str) -> HashMap<String, usize> {
-    static IP_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"(\d{1,3}\.){3}\d{1,3}").unwrap());
-    let file = File::open(file_path).expect("Failed to open log file");
+    static IP_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+        // IPv4 and IPv6 regex
+        Regex::new(r"((\d{1,3}\.){3}\d{1,3})|([a-fA-F0-9:]{2,39})").unwrap()
+    });
+    let file = match File::open(file_path) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Error: Failed to open log file: {e}");
+            return HashMap::new();
+        }
+    };
     let reader = BufReader::new(file);
     let mut ip_counts: HashMap<String, usize> = HashMap::new();
     for line in reader.lines().map_while(Result::ok) {
         for cap in IP_RE.captures_iter(&line) {
             let ip = cap[0].to_string();
-            *ip_counts.entry(ip).or_insert(0) += 1;
+            if is_valid_ip(&ip) {
+                *ip_counts.entry(ip).or_insert(0) += 1;
+            }
         }
     }
     ip_counts
@@ -90,22 +113,27 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
     // Load cache from file
     let cache_path = "ipinfo_cache.tsv";
     let mut cache: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
-    if let Ok(cache_file) = File::open(cache_path) {
-        let reader = BufReader::new(cache_file);
-        for line in reader.lines() {
-            match line {
-                Ok(line) => {
-                    let parts: Vec<_> = line.splitn(3, '\t').collect();
-                    if parts.len() == 3 && is_valid_ip(parts[0]) {
-                        cache.insert(parts[0].to_string(), (Some(parts[1].to_string()).filter(|s| s != "N/A"), Some(parts[2].to_string()).filter(|s| s != "N/A")));
-                    } else {
-                        eprintln!("Warning: Skipping malformed or invalid cache line: {line}");
+    match File::open(cache_path) {
+        Ok(cache_file) => {
+            let reader = BufReader::new(cache_file);
+            for line in reader.lines() {
+                match line {
+                    Ok(line) => {
+                        let parts: Vec<_> = line.splitn(3, '\t').collect();
+                        if parts.len() == 3 && is_valid_ip(parts[0]) {
+                            cache.insert(parts[0].to_string(), (Some(parts[1].to_string()).filter(|s| s != "N/A"), Some(parts[2].to_string()).filter(|s| s != "N/A")));
+                        } else {
+                            eprintln!("Warning: Skipping malformed or invalid cache line: {line}");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to read cache line: {e}");
                     }
                 }
-                Err(e) => {
-                    eprintln!("Warning: Failed to read cache line: {e}");
-                }
             }
+        }
+        Err(e) => {
+            eprintln!("Warning: Could not open cache file: {e}");
         }
     }
 
@@ -160,15 +188,8 @@ async fn print_ip_info_sorted(ip_counts: HashMap<String, usize>, client: &Client
             }
         }
     }
-/// Validates an IPv4 address string.
-fn is_valid_ip(ip: &str) -> bool {
-    // Simple IPv4 validation
-    let parts: Vec<_> = ip.split('.').collect();
-    if parts.len() != 4 {
-        return false;
-    }
-    parts.iter().all(|part| part.parse::<u8>().is_ok())
-}
+
+
 
     // Sort results by count descending before printing
     results.sort_by(|a, b| b.1.cmp(&a.1));
