@@ -12,9 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Rust
-        uses: actions/setup-rust@v1
+        uses: actions/setup-toolchain@v1
         with:
-          rust-version: stable
+          toolchain: stable
       - name: Install Clippy
         run: rustup component add clippy
       - name: Run tests
