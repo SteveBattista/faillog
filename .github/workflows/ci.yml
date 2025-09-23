@@ -1,15 +1,26 @@
-name: CI
+name: Clippy Check
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  build:
-    docker:
-      - image: cimg/rust:1.90.0
+  clippy:
+    runs-on: ubuntu-latest
     steps:
-      - checkout
-      - run: cargo --version
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets -- -D warnings
