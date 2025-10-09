@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "censys",
         "clippy",
         "dotenvy",
         "faillog",
@@ -8,6 +9,7 @@
         "reqwest",
         "rustup",
         "serde",
-        "splitn"
+        "splitn",
+        "whois"
     ]
 }

@@ -18,6 +18,7 @@ git clone https://github.com/yourusername/faillog.git
 cd faillog
 cp .env.example .env
 # Edit .env and set your IPINFO_TOKEN
+# Optional: Add CENSYS_ORG_ID and CENSYS_API_SECRET for additional data
 cargo run --release
 ```
 
@@ -117,6 +118,21 @@ A Rust tool to parse fail2ban log files, extract unique IP addresses, and look u
 - The cache file `ipinfo_cache.tsv` is automatically updated with new lookups.
 - The file `ipinfo_cache.tsv` is excluded from spell checking.
 - The tool is designed for Linux and should work on any platform supported by Rust and the dependencies.
+
+## IP Data Sources
+
+This tool uses two sources of IP information:
+
+1. **IPInfo.io API**: Provides country and organization data for IPs (required)
+2. **Censys API**: Provides additional organization and country data (optional)
+
+To use the Censys API integration, you need to:
+
+1. Sign up for an account at [Censys.io](https://censys.io/)
+2. Get your organization ID and API secret
+3. Add these to your `.env` file as `CENSYS_ORG_ID` and `CENSYS_API_SECRET`
+
+The output will display data from both sources side by side for each IP address.
 
 ## License
 
