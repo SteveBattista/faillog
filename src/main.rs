@@ -14,6 +14,7 @@ use serde_json::{Value, from_str};
 
 use regex::Regex;
 use log::{warn, error};
+use std::process::exit;
 
 /// Configuration struct to hold all API credentials
 #[derive(Debug, Clone)]
@@ -520,16 +521,27 @@ async fn main() {
     dotenvy::from_filename(".env").ok();
     env_logger::init();
     
-    // Load all environment variables at the beginning
-    let ipinfo_token = env::var("IPINFO_TOKEN").expect("IPINFO_TOKEN environment variable not set");
-    let censys_org_id = env::var("CENSYS_ORG_ID").unwrap_or_else(|_| {
-        log::warn!("CENSYS_ORG_ID environment variable not found");
-        "".to_string()
-    });
-    let censys_api_secret = env::var("CENSYS_API_SECRET").unwrap_or_else(|_| {
-        log::warn!("CENSYS_API_SECRET environment variable not found");
-        "".to_string()
-    });
+    let ipinfo_token = match env::var("IPINFO_TOKEN") {
+        Ok(token) => token,
+        Err(_) => {
+            log::error!("IPINFO_TOKEN environment variable not found");
+            exit(1);
+        }
+    };
+    let censys_org_id = match env::var("CENSYS_ORG_ID") {
+        Ok(id) => id,
+        Err(_) => {
+            log::error!("CENSYS_ORG_ID environment variable not found");
+            exit(1);
+        }
+    };
+    let censys_api_secret = match env::var("CENSYS_API_SECRET") {
+        Ok(secret) => secret,
+        Err(_) => {
+            log::error!("CENSYS_API_SECRET environment variable not found");
+            exit(1);
+        }
+    };
     
     
     let ip_counts = parse_log_file("data/ban_log.txt");
