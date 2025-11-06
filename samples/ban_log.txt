@@ -1,9 +1,0 @@
-# Example fail2ban ban_log.txt
-# This file contains sample log lines for testing faillog.
-
-2025-09-23 12:00:01,123 fail2ban.actions        [1234]: NOTICE  [sshd] Ban 192.0.2.1
-2025-09-23 12:01:02,456 fail2ban.actions        [1234]: NOTICE  [sshd] Ban 2001:db8::1
-2025-09-23 12:02:03,789 fail2ban.actions        [1234]: NOTICE  [sshd] Ban 192.0.2.1
-2025-09-23 12:03:04,012 fail2ban.actions        [1234]: NOTICE  [sshd] Ban 203.0.113.5
-2025-09-23 12:04:05,345 fail2ban.actions        [1234]: NOTICE  [sshd] Ban 2001:db8::1
-2025-09-23 12:05:06,678 fail2ban.actions        [1234]: NOTICE  [sshd] Ban 198.51.100.42
